@@ -1,74 +1,137 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Image,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
+import axios from "axios";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const SERVER_URL = "http://192.168.1.12:3000";
 
-export default function HomeScreen() {
+export default function App() {
+  const [image, setImage] = useState(null);
+  const [lockState, setLockState] = useState("lock");
+  const [loading, setLoading] = useState(false);
+
+  const fetchImage = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${SERVER_URL}/image`);
+      setImage(res.data.image);
+    } catch (err) {
+      console.error("Failed to fetch image:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLockState = async () => {
+    try {
+      const res = await axios.get(`${SERVER_URL}/lock-state`);
+      setLockState(res.data);
+    } catch (err) {
+      console.error("Failed to fetch lock state:", err);
+    }
+  };
+
+  const toggleLock = async () => {
+    const newState = lockState === "lock" ? "unlock" : "lock";
+    try {
+      await axios.post(`${SERVER_URL}/toggle-lock`, { state: newState });
+      setLockState(newState);
+    } catch (err) {
+      console.error("Failed to toggle lock state:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchImage();
+    fetchLockState();
+
+    // Optional: refresh every 10 seconds
+    const interval = setInterval(() => {
+      fetchImage();
+      fetchLockState();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Smart Door Lock</Text>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#000" />
+      ) : image ? (
         <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+          source={{ uri: `data:image/png;base64,${image}` }}
+          style={styles.image}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      ) : (
+        <Text>No Image Available</Text>
+      )}
+
+      <TouchableOpacity style={styles.button} onPress={fetchImage}>
+        <Text style={styles.buttonText}>🔄 Refresh Image</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.button,
+          lockState === "lock" ? styles.locked : styles.unlocked,
+        ]}
+        onPress={toggleLock}
+      >
+        <Text style={styles.buttonText}>
+          {lockState === "lock"
+            ? "🔒 Locked (Tap to Unlock)"
+            : "🔓 Unlocked (Tap to Lock)"}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    backgroundColor: "#f7f7f7",
+    minHeight: "100%",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    marginBottom: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  image: {
+    width: 300,
+    height: 220,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  button: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 10,
+    width: "100%",
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  locked: {
+    backgroundColor: "#d9534f",
+  },
+  unlocked: {
+    backgroundColor: "#5cb85c",
   },
 });
